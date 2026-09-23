@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { Asset } from "@/data/assets";
 import { cn } from "@/lib/utils";
 
@@ -17,9 +20,10 @@ const sizeMap = {
 };
 
 export function AssetLogo({ asset, size = "md", className }: AssetLogoProps) {
+  const [hasError, setHasError] = useState(false);
   const { outer, text } = sizeMap[size];
 
-  if (asset.logoUrl) {
+  if (asset.logoUrl && !hasError) {
     return (
       <div
         className={cn(
@@ -33,9 +37,7 @@ export function AssetLogo({ asset, size = "md", className }: AssetLogoProps) {
           src={asset.logoUrl}
           alt={asset.companyName}
           className="h-full w-full object-contain p-0.5"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = "none";
-          }}
+          onError={() => setHasError(true)}
         />
       </div>
     );
