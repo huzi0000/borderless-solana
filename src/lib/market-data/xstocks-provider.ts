@@ -142,10 +142,15 @@ async function fetchWithTimeout(url: string, timeoutMs = FETCH_TIMEOUT_MS): Prom
   try {
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: { Accept: "application/json" },
-      // Next.js: cache for 300 seconds (5 mins)
-      next: { revalidate: 300 },
-    } as RequestInit);
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "Borderless/1.0",
+      },
+      // Disable Next.js persistent Data Cache: the full token catalogue is ~2.38 MB,
+      // which exceeds Next.js 2 MB per-item limit. In-memory caching and inflight
+      // deduplication are handled in-memory by XStocksProvider.
+      cache: "no-store",
+    });
     return res;
   } finally {
     clearTimeout(timer);
