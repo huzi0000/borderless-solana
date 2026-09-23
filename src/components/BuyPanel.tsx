@@ -37,17 +37,19 @@ export function BuyPanel({ asset }: BuyPanelProps) {
   const { setVisible: openWalletModal } = useWalletModal();
   const { getHolding, executeTrade } = usePortfolio();
 
+  const hasPrice = typeof asset.price === "number" && asset.price > 0;
+  const currentPrice = asset.price ?? 0;
   const holding = getHolding(asset.id);
   const availableUnits = holding ? holding.quantity : 0;
-  const availableUsdValue = availableUnits * asset.price;
+  const availableUsdValue = availableUnits * currentPrice;
 
   const numAmount = parseFloat(amount) || 0;
-  const estimatedQuantity = asset.price > 0 ? numAmount / asset.price : 0;
+  const estimatedQuantity = hasPrice ? numAmount / currentPrice : 0;
 
   // Validation
   const isPositive = numAmount > 0;
   const hasSufficientBalance = side === "BUY" || numAmount <= availableUsdValue + 0.001;
-  const isValid = isPositive && hasSufficientBalance;
+  const isValid = hasPrice && isPositive && hasSufficientBalance;
 
   const handleBuyPreset = (val: number) => {
     setAmount(String(val));
@@ -251,7 +253,7 @@ export function BuyPanel({ asset }: BuyPanelProps) {
           <div className="flex items-center justify-between text-xs">
             <span className="text-text-muted">Reference price</span>
             <span className="tabular-nums text-text-secondary">
-              {formatCurrency(asset.price)}
+              {hasPrice ? formatCurrency(currentPrice) : "Price unavailable"}
             </span>
           </div>
           <div className="flex items-center justify-between text-xs">
@@ -272,7 +274,7 @@ export function BuyPanel({ asset }: BuyPanelProps) {
               <Info size={11} />
               Transaction type
             </span>
-            <span className="text-amber-400 font-medium">Demo / Simulated</span>
+            <span className="text-amber-400 font-medium">Trade Simulation</span>
           </div>
         </div>
 
@@ -289,16 +291,20 @@ export function BuyPanel({ asset }: BuyPanelProps) {
             !isValid && "cursor-not-allowed"
           )}
         >
-          Review order
+          {!hasPrice ? "Price Unavailable" : "Review order"}
         </button>
 
-        {!isValid && (
+        {!hasPrice ? (
+          <p className="mt-2 text-center text-xs text-amber-400/90">
+            Reference price is unavailable from public feed. Trade simulation is paused for this asset.
+          </p>
+        ) : !isValid ? (
           <p className="mt-2 text-center text-xs text-text-muted">
             {side === "SELL" && availableUnits <= 0
               ? "You do not hold this asset yet"
               : "Enter an amount to continue"}
           </p>
-        )}
+        ) : null}
       </div>
 
       {/* Confirmation & Execution Modal */}
@@ -320,7 +326,7 @@ export function BuyPanel({ asset }: BuyPanelProps) {
                     {side} Order
                   </span>
                   <span className="text-xs text-text-muted">·</span>
-                  <span className="text-xs text-text-muted">Demo Review</span>
+                  <span className="text-xs text-amber-400 font-medium">Trade Simulation</span>
                 </div>
                 <h3 className="text-lg font-bold text-text-primary">
                   {side === "BUY" ? `Buy ${asset.tokenTicker}` : `Sell ${asset.tokenTicker}`}
@@ -352,7 +358,7 @@ export function BuyPanel({ asset }: BuyPanelProps) {
                 <div className="flex items-center justify-between">
                   <span className="text-text-muted">Price</span>
                   <span className="text-text-secondary text-xs">
-                    {formatCurrency(asset.price)} (Demo reference price)
+                    {hasPrice ? `${formatCurrency(currentPrice)} (Reference price)` : "Price unavailable"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -377,7 +383,7 @@ export function BuyPanel({ asset }: BuyPanelProps) {
 
               {/* Safety notice */}
               <div className="mb-5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-400/90 leading-relaxed">
-                <span className="font-semibold">SIMULATED EXECUTION:</span> Live execution is not enabled in this prototype. Live atomic trade execution on Solana requires an authorized Backed/xStocks institutional client account. Trades update your local demo portfolio only.
+                <span className="font-semibold">TRADE SIMULATION:</span> This is a paper trade simulation recorded to your browser session. No real assets, funds, or crypto will be debited or credited, and no on-chain transaction will be submitted.
               </div>
 
               {/* Action Buttons */}
@@ -396,7 +402,7 @@ export function BuyPanel({ asset }: BuyPanelProps) {
                   onClick={handleConfirmTrade}
                   className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-black transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
-                  Confirm demo transaction
+                  Execute Simulation
                 </button>
               )}
 
@@ -414,10 +420,10 @@ export function BuyPanel({ asset }: BuyPanelProps) {
             <div className="py-12 text-center">
               <Loader2 size={36} className="mx-auto mb-4 animate-spin text-accent" />
               <h3 className="mb-2 text-base font-semibold text-text-primary">
-                Processing demo transaction...
+                Executing trade simulation...
               </h3>
               <p className="text-xs text-text-secondary max-w-xs mx-auto">
-                Submitting simulated order for {formatNumber(estimatedQuantity, 4)} {asset.tokenTicker} on Solana Devnet...
+                Recording simulated {side.toLowerCase()} order for {formatNumber(estimatedQuantity, 4)} {asset.tokenTicker} into demo portfolio...
               </p>
             </div>
           )}
@@ -429,10 +435,10 @@ export function BuyPanel({ asset }: BuyPanelProps) {
                 <CheckCircle2 size={24} />
               </div>
               <h3 className="mb-1 text-lg font-bold text-text-primary">
-                Demo transaction successful
+                Simulation Executed
               </h3>
               <p className="mb-5 text-xs text-text-secondary max-w-sm mx-auto">
-                Your simulated {completedTrade.side.toLowerCase()} order has been confirmed and applied to your local portfolio.
+                Recorded to local demo portfolio (no on-chain transaction was submitted).
               </p>
 
               {/* Receipt details */}
@@ -456,7 +462,7 @@ export function BuyPanel({ asset }: BuyPanelProps) {
                 <div className="flex justify-between">
                   <span className="text-text-muted">Reference price</span>
                   <span className="tabular-nums text-text-secondary">
-                    {formatCurrency(completedTrade.price)}
+                    {completedTrade.price > 0 ? formatCurrency(completedTrade.price) : "Price unavailable"}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -476,11 +482,11 @@ export function BuyPanel({ asset }: BuyPanelProps) {
                   </span>
                 </div>
                 <div className="border-t border-surface-border pt-2 flex items-center justify-between">
-                  <span className="text-text-muted">Demo Tx ID</span>
+                  <span className="text-text-muted">Simulation Record ID</span>
                   <button
                     onClick={handleCopyTxId}
                     className="flex items-center gap-1 font-mono text-[11px] text-accent hover:underline"
-                    title="Copy Transaction ID"
+                    title="Copy Simulation Record ID"
                   >
                     <span>{completedTrade.id.slice(0, 16)}...</span>
                     {txIdCopied ? <Check size={11} /> : <Copy size={11} />}

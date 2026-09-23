@@ -1,8 +1,8 @@
 import { cn } from "@/lib/utils";
 
 interface PriceChangeProps {
-  value: number;
-  percent: number;
+  value?: number;
+  percent?: number;
   className?: string;
   showSign?: boolean;
   size?: "sm" | "md" | "lg";
@@ -15,6 +15,10 @@ export function PriceChange({
   showSign = true,
   size = "md",
 }: PriceChangeProps) {
+  if (value === undefined || percent === undefined) {
+    return <span className={cn("text-xs text-text-muted font-mono", className)}>24h change unavailable</span>;
+  }
+
   const isPositive = percent >= 0;
   const sign = isPositive ? "+" : "";
 
@@ -40,11 +44,24 @@ export function PriceChange({
 }
 
 interface PercentBadgeProps {
-  percent: number;
+  percent?: number;
   className?: string;
 }
 
 export function PercentBadge({ percent, className }: PercentBadgeProps) {
+  if (percent === undefined || percent === null) {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium tabular-nums text-text-muted",
+          className
+        )}
+      >
+        —
+      </span>
+    );
+  }
+
   const isPositive = percent >= 0;
   const sign = isPositive ? "+" : "";
 

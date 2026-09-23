@@ -107,7 +107,7 @@ export function SearchOverlay({ onClose }: SearchOverlayProps) {
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <span className="text-sm tabular-nums text-text-secondary">
-                          {formatCurrency(asset.price)}
+                          {asset.price !== undefined ? formatCurrency(asset.price) : "—"}
                         </span>
                         <PercentBadge percent={asset.changePercent24h} />
                         <ArrowRight size={12} className="text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />

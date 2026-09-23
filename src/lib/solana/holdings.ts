@@ -159,10 +159,10 @@ export async function fetchLiveWalletHoldings(
           // Real live price is only set if verified live source exists
           price: matchedAsset.priceDataSource === "live" ? matchedAsset.price : undefined,
           marketValue:
-            matchedAsset.priceDataSource === "live"
+            matchedAsset.priceDataSource === "live" && matchedAsset.price !== undefined
               ? tokenAcct.uiAmount * matchedAsset.price
               : undefined,
-          priceStatus: matchedAsset.priceDataSource === "live" ? "live" : "unavailable",
+          priceStatus: matchedAsset.priceDataSource === "live" && matchedAsset.price !== undefined ? "live" : "unavailable",
           network: currentNetwork,
         });
       }

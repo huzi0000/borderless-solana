@@ -10,14 +10,13 @@ import {
   AlertTriangle,
   Fingerprint,
 } from "lucide-react";
-import { getAssetById } from "@/data/assets";
+import { getAssetById, normalizeSymbol } from "@/data/assets";
 import type { Asset } from "@/data/assets";
 import { getMarketDataProvider } from "@/lib/market-data";
 import { AssetLogo } from "@/components/ui/AssetLogo";
 import { PriceChange } from "@/components/ui/PriceChange";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 import { WatchlistButton } from "@/components/ui/WatchlistButton";
-import { PriceChart } from "@/components/PriceChart";
 import { BuyPanel } from "@/components/BuyPanel";
 import { DataSourceBadge, PriceSourceBadge } from "@/components/ui/DataSourceBadge";
 import { CopyButton } from "@/components/ui/CopyButton";
@@ -29,27 +28,31 @@ interface AssetPageProps {
 }
 
 export async function generateMetadata({ params }: AssetPageProps) {
-  const { id } = await params;
-  const asset = await fetchAsset(id);
-  if (!asset) return { title: "Asset not found | Borderless" };
-  return {
-    title: `${asset.tokenTicker} — ${asset.companyName} | Borderless`,
-    description: `Inspect and trade ${asset.tokenTicker} tokenized equity on Solana with Borderless.`,
-  };
+  try {
+    const { id } = await params;
+    const asset = await fetchAsset(id);
+    if (!asset) return { title: "Asset not found | Borderless" };
+    return {
+      title: `${asset.tokenTicker} — ${asset.companyName} | Borderless`,
+      description: `Inspect official ${asset.tokenTicker} tokenized equity on Solana with Borderless.`,
+    };
+  } catch {
+    return { title: "Asset Details | Borderless" };
+  }
 }
 
 // Fetch the asset directly from the market data provider (server-side direct lookup)
-// Avoids HTTP fetch-to-self, eliminating network latency and port/URL dependency in production.
 async function fetchAsset(id: string): Promise<Asset | null> {
   if (!id) return null;
+  const { clean } = normalizeSymbol(id);
   try {
     const provider = getMarketDataProvider();
-    const asset = await provider.getAsset(id);
+    const asset = await provider.getAsset(clean);
     if (asset) return asset;
   } catch (err) {
-    console.warn(`[AssetPage] Provider failed for ${id}, using fallback:`, err);
+    console.warn(`[AssetPage] Provider lookup failed for ${id}, using fallback:`, err);
   }
-  return getAssetById(id) ?? null;
+  return getAssetById(clean) ?? null;
 }
 
 export default async function AssetPage({ params }: AssetPageProps) {
@@ -57,9 +60,9 @@ export default async function AssetPage({ params }: AssetPageProps) {
   const asset = await fetchAsset(id);
   if (!asset) notFound();
 
-  const isPositive = asset.changePercent24h >= 0;
   const hasRealMint = !!(asset.mintAddress && asset.mintNetwork === "Solana");
   const isLiveToken = asset.tokenDataSource === "live";
+  const hasPrice = typeof asset.price === "number" && !isNaN(asset.price) && asset.price > 0;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
@@ -80,7 +83,7 @@ export default async function AssetPage({ params }: AssetPageProps) {
           <div>
             <span className="text-sm font-semibold text-red-400">Trading Halted</span>
             <p className="text-xs text-red-400/80 mt-0.5">
-              The issuer has halted trading for {asset.tokenTicker}. This status is sourced from the official xStocks API.
+              The issuer has halted trading for {asset.tokenTicker}. This status is sourced directly from the official xStocks API.
             </p>
           </div>
         </div>
@@ -100,6 +103,9 @@ export default async function AssetPage({ params }: AssetPageProps) {
                     Tokenized Equity
                   </span>
                   <DataSourceBadge source={asset.tokenDataSource} label={isLiveToken ? "LIVE TOKEN" : "DEMO TOKEN"} />
+                  <span className="rounded border border-surface-border bg-surface-raised px-2 py-0.5 text-[10px] font-mono text-text-muted">
+                    Official xStocks data
+                  </span>
                 </div>
                 <p className="text-base text-text-secondary mt-0.5 truncate">{asset.companyName}</p>
                 <div className="mt-2 flex items-center gap-2 flex-wrap text-xs text-text-muted">
@@ -126,17 +132,30 @@ export default async function AssetPage({ params }: AssetPageProps) {
           <div className="rounded-xl border border-surface-border bg-surface p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-3 mb-2">
               <div>
-                <span className="text-3xl font-bold tabular-nums text-text-primary sm:text-4xl">
-                  {formatCurrency(asset.price)}
-                </span>
-                <div className="mt-1 flex items-center gap-2">
-                  <PriceChange
-                    value={asset.change24h}
-                    percent={asset.changePercent24h}
-                    size="lg"
-                  />
-                  <span className="text-xs text-text-muted">24h</span>
-                </div>
+                {hasPrice ? (
+                  <>
+                    <span className="text-3xl font-bold tabular-nums text-text-primary sm:text-4xl">
+                      {formatCurrency(asset.price!)}
+                    </span>
+                    <div className="mt-1 flex items-center gap-2">
+                      <PriceChange
+                        value={asset.change24h}
+                        percent={asset.changePercent24h}
+                        size="lg"
+                      />
+                      <span className="text-xs text-text-muted">24h</span>
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <span className="text-2xl font-bold text-text-primary sm:text-3xl">
+                      Price unavailable
+                    </span>
+                    <p className="mt-1 text-xs text-text-muted leading-relaxed max-w-sm">
+                      Public real-time price quotes require institutional Backed API credentials.
+                    </p>
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <PriceSourceBadge source={asset.priceDataSource} />
@@ -144,12 +163,15 @@ export default async function AssetPage({ params }: AssetPageProps) {
               </div>
             </div>
 
-            {/* Price Chart */}
+            {/* Historical Chart Placeholder — No fabricated chart data */}
             <div className="mt-4 pt-4 border-t border-surface-border">
-              <PriceChart
-                basePrice={asset.price}
-                isPositive={isPositive}
-              />
+              <div className="rounded-lg border border-surface-border bg-surface-raised/40 p-6 text-center text-xs text-text-muted flex flex-col items-center justify-center gap-2">
+                <Activity size={18} className="text-text-muted/60" />
+                <span className="font-semibold text-text-secondary">Historical Chart Data Unavailable</span>
+                <span className="text-[11px] text-text-muted max-w-sm leading-relaxed">
+                  Historical OHLCV data is not provided on the public xStocks endpoint. Borderless does not generate synthetic price charts.
+                </span>
+              </div>
             </div>
           </div>
 
@@ -194,9 +216,9 @@ export default async function AssetPage({ params }: AssetPageProps) {
                 </span>
               </div>
               <div className="rounded-lg border border-surface-border bg-surface-raised p-3">
-                <span className="text-[11px] text-text-muted block mb-1">Trading Fee</span>
-                <span className="text-xs font-medium text-text-primary">
-                  0.00% (Prototype)
+                <span className="text-[11px] text-text-muted block mb-1">Token Multiplier</span>
+                <span className="text-xs font-mono font-medium text-text-primary">
+                  {asset.currentMultiplier ? asset.currentMultiplier.toFixed(6) : "1.000000"}
                 </span>
               </div>
               <div className="rounded-lg border border-surface-border bg-surface-raised p-3">
@@ -209,7 +231,7 @@ export default async function AssetPage({ params }: AssetPageProps) {
             </div>
           </div>
 
-          {/* ── Token Details — only shown when we have real mint data ── */}
+          {/* ── Token Details — verified official mint data ── */}
           {hasRealMint && asset.mintAddress && (
             <div className="rounded-xl border border-surface-border bg-surface p-5">
               <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -276,7 +298,7 @@ export default async function AssetPage({ params }: AssetPageProps) {
                 >
                   api.backed.fi
                 </a>
-                . Token exists on Solana Mainnet — trading simulation runs on Devnet.
+                . Token exists on Solana Mainnet.
               </p>
             </div>
           )}
@@ -302,7 +324,7 @@ export default async function AssetPage({ params }: AssetPageProps) {
               {hasRealMint
                 ? " The token mint address displayed above is sourced from the official xStocks API and exists on Solana Mainnet."
                 : " In this product prototype, transactions and holdings are simulated locally on Solana Devnet."}
-              {" "}All prices shown are demo/indicative reference prices, not live market quotes. Trade execution is simulated — no real assets are moved.
+              {" "}Public reference prices are displayed when available; otherwise shown as unavailable. Trade execution in this MVP operates in Trade Simulation mode.
             </p>
           </div>
         </div>
@@ -313,7 +335,7 @@ export default async function AssetPage({ params }: AssetPageProps) {
             <BuyPanel asset={asset} />
             <div className="rounded-xl border border-surface-border bg-surface p-4 text-xs text-text-muted leading-relaxed">
               <span className="font-semibold text-text-secondary block mb-1">Interactive Trading Demo</span>
-              Trades executed in this panel update your local demo portfolio. Connect any Solana Devnet wallet (Phantom, Solflare, Backpack) to experience the full flow.
+              Trades executed in this panel update your local demo portfolio in simulation mode. Connect any Solana wallet to experience the flow.
             </div>
           </div>
         </div>

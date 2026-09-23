@@ -100,12 +100,16 @@ export default function HomePage() {
                   </td>
                   <td className="px-4 py-3.5 text-right tabular-nums text-sm text-text-primary">
                     <Link href={`/asset/${asset.id}`} className="block focus:outline-none">
-                      {formatCurrency(asset.price)}
+                      {asset.price !== undefined ? formatCurrency(asset.price) : "Price unavailable"}
                     </Link>
                   </td>
                   <td className="px-4 py-3.5 text-right">
                     <Link href={`/asset/${asset.id}`} className="block focus:outline-none">
-                      <PercentBadge percent={asset.changePercent24h} />
+                      {asset.changePercent24h !== undefined ? (
+                        <PercentBadge percent={asset.changePercent24h} />
+                      ) : (
+                        <span className="text-xs text-text-muted">—</span>
+                      )}
                     </Link>
                   </td>
                   <td className="px-4 py-3.5 text-right hidden lg:table-cell">
@@ -138,9 +142,13 @@ export default function HomePage() {
               </div>
               <div className="text-right">
                 <div className="text-sm tabular-nums font-medium text-text-primary">
-                  {formatCurrency(asset.price)}
+                  {asset.price !== undefined ? formatCurrency(asset.price) : "Price unavailable"}
                 </div>
-                <PercentBadge percent={asset.changePercent24h} />
+                {asset.changePercent24h !== undefined ? (
+                  <PercentBadge percent={asset.changePercent24h} />
+                ) : (
+                  <span className="text-xs text-text-muted">—</span>
+                )}
               </div>
             </Link>
           ))}
@@ -238,9 +246,7 @@ export default function HomePage() {
         </div>
 
         <div className="mt-10 rounded-lg border border-amber-500/20 bg-amber-500/5 px-5 py-4 text-sm text-text-secondary leading-relaxed">
-          <span className="font-medium text-amber-400">Note:</span> Wallet connectivity and trade
-          execution will be enabled in a future integration phase. This prototype demonstrates the
-          interface and experience.
+          <span className="font-medium text-amber-400">Note:</span> Non-custodial Solana wallet connectivity is active for on-chain holdings verification. Market metadata is sourced from official Backed/xStocks registries. Trade execution operates in simulation mode.
         </div>
       </section>
     </div>

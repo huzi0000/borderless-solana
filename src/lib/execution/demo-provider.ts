@@ -17,7 +17,8 @@ export class DemoExecutionProvider implements ExecutionProvider {
 
   async getQuote(req: ExecutionQuoteRequest): Promise<ExecutionQuote> {
     const { asset, side, amountUsd } = req;
-    const quantity = asset.price > 0 ? amountUsd / asset.price : 0;
+    const price = asset.price ?? 0;
+    const quantity = price > 0 ? amountUsd / price : 0;
 
     return {
       quoteId: `quote_sim_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -26,8 +27,8 @@ export class DemoExecutionProvider implements ExecutionProvider {
       side,
       amountUsd,
       quantity,
-      price: asset.price,
-      priceSource: asset.priceDataSource,
+      price,
+      priceSource: asset.priceDataSource ?? "unavailable",
       isExecutable: false, // Indicative/simulated only
       mode: "simulation",
       expiresAt: Date.now() + 60_000, // 60s validity window

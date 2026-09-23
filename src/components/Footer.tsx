@@ -6,8 +6,7 @@ export function Footer() {
           <div>
             <span className="text-sm font-bold text-text-primary">Borderless</span>
             <p className="mt-1 text-xs text-text-muted leading-relaxed max-w-md">
-              Borderless is a product prototype. Market information shown in this version is demo
-              data and does not constitute investment advice.
+              Borderless is a non-custodial interface prototype. Token metadata is sourced from official Backed/xStocks registries. Trade execution operates in paper simulation mode. Does not constitute financial or investment advice.
             </p>
           </div>
           <div className="text-xs text-text-muted">

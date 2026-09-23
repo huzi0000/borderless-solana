@@ -127,10 +127,14 @@ export default function WatchlistPage() {
                       </Link>
                     </td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-sm text-text-primary">
-                      {formatCurrency(asset.price)}
+                      {asset.price !== undefined ? formatCurrency(asset.price) : "Price unavailable"}
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <PercentBadge percent={asset.changePercent24h} />
+                      {asset.changePercent24h !== undefined ? (
+                        <PercentBadge percent={asset.changePercent24h} />
+                      ) : (
+                        <span className="text-xs text-text-muted">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3.5 text-right hidden md:table-cell">
                       <span className="rounded border border-surface-border px-2 py-0.5 text-xs text-text-muted">
@@ -167,9 +171,13 @@ export default function WatchlistPage() {
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <div className="text-right">
                     <div className="text-sm tabular-nums font-medium text-text-primary">
-                      {formatCurrency(asset.price)}
+                      {asset.price !== undefined ? formatCurrency(asset.price) : "Price unavailable"}
                     </div>
-                    <PercentBadge percent={asset.changePercent24h} />
+                    {asset.changePercent24h !== undefined ? (
+                      <PercentBadge percent={asset.changePercent24h} />
+                    ) : (
+                      <span className="text-xs text-text-muted">—</span>
+                    )}
                   </div>
                   <WatchlistButton assetId={asset.id} size="sm" />
                 </div>

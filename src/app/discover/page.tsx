@@ -31,9 +31,9 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 function sortAssets(assets: Asset[], sort: SortOption): Asset[] {
   switch (sort) {
     case "gainers":
-      return [...assets].sort((a, b) => b.changePercent24h - a.changePercent24h);
+      return [...assets].sort((a, b) => (b.changePercent24h ?? 0) - (a.changePercent24h ?? 0));
     case "losers":
-      return [...assets].sort((a, b) => a.changePercent24h - b.changePercent24h);
+      return [...assets].sort((a, b) => (a.changePercent24h ?? 0) - (b.changePercent24h ?? 0));
     case "az":
       return [...assets].sort((a, b) => a.companyName.localeCompare(b.companyName));
     case "popular":
@@ -113,7 +113,7 @@ export default function DiscoverPage() {
                 source={marketSource}
                 label={marketSource === "live" ? "xStocks LIVE TOKENS" : "DEMO TOKENS"}
               />
-              <PriceSourceBadge source="demo" />
+              <PriceSourceBadge source={marketSource === "live" ? "unavailable" : "demo"} />
             </div>
             <p className="mt-1 text-sm text-text-secondary">
               Discover tokenized global equities on Solana.
@@ -245,13 +245,19 @@ export default function DiscoverPage() {
                     </td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-sm text-text-primary">
                       <Link href={`/asset/${asset.id}`} className="block focus:outline-none">
-                        <div>{formatCurrency(asset.price)}</div>
-                        <span className="text-[10px] text-text-muted font-mono">Demo Price</span>
+                        <div>{asset.price !== undefined ? formatCurrency(asset.price) : "Price unavailable"}</div>
+                        <span className="text-[10px] text-text-muted font-mono">
+                          {asset.price !== undefined ? (asset.priceDataSource === "live" ? "Official Price" : "Demo Price") : "No Feed"}
+                        </span>
                       </Link>
                     </td>
                     <td className="px-4 py-3.5 text-right">
                       <Link href={`/asset/${asset.id}`} className="flex justify-end focus:outline-none">
-                        <PercentBadge percent={asset.changePercent24h} />
+                        {asset.changePercent24h !== undefined ? (
+                          <PercentBadge percent={asset.changePercent24h} />
+                        ) : (
+                          <span className="text-xs text-text-muted">—</span>
+                        )}
                       </Link>
                     </td>
                     <td className="px-4 py-3.5 text-right hidden md:table-cell">
@@ -303,9 +309,13 @@ export default function DiscoverPage() {
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <div className="text-right">
                     <div className="text-sm tabular-nums font-medium text-text-primary">
-                      {formatCurrency(asset.price)}
+                      {asset.price !== undefined ? formatCurrency(asset.price) : "Price unavailable"}
                     </div>
-                    <PercentBadge percent={asset.changePercent24h} />
+                    {asset.changePercent24h !== undefined ? (
+                      <PercentBadge percent={asset.changePercent24h} />
+                    ) : (
+                      <span className="text-xs text-text-muted">—</span>
+                    )}
                   </div>
                   <WatchlistButton assetId={asset.id} size="sm" />
                 </div>

@@ -161,12 +161,12 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         const asset = getAssetById(h.assetId);
         if (!asset) return null;
 
-        const currentPrice = asset.price;
+        const currentPrice = asset.price ?? 0;
         const marketValue = h.quantity * currentPrice;
         const costBasis = h.quantity * h.averagePrice;
         const pnl = marketValue - costBasis;
         const pnlPercent = costBasis > 0 ? (pnl / costBasis) * 100 : 0;
-        const todayChange = asset.change24h * h.quantity;
+        const todayChange = (asset.change24h ?? 0) * h.quantity;
 
         return {
           assetId: h.assetId,

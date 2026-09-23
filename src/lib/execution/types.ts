@@ -16,7 +16,7 @@ export interface ExecutionQuote {
   amountUsd: number;
   quantity: number;
   price: number;
-  priceSource: "live" | "demo";
+  priceSource: "live" | "demo" | "unavailable";
   isExecutable: boolean;
   mode: ExecutionMode;
   expiresAt: number;

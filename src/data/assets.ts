@@ -25,9 +25,9 @@ export interface Asset {
   tokenTicker: string; // Tokenized ticker, e.g. NVDAx
   category: AssetCategory;
   description: string;
-  price: number; // USD
-  change24h: number; // USD
-  changePercent24h: number; // %
+  price?: number; // USD — optional if unavailable from official source
+  change24h?: number; // USD — optional if unavailable
+  changePercent24h?: number; // % — optional if unavailable
   logoInitials: string; // Used for avatar fallback
   logoColor: string; // Hex background for avatar
   popular: boolean;
@@ -39,9 +39,10 @@ export interface Asset {
   isin?: string;
   logoUrl?: string;         // Official logo from xStocks CDN
   xstocksId?: string;
+  currentMultiplier?: number; // Real rebasing multiplier from official Backed API
   // Data source labels — always present, always honest
   tokenDataSource: "live" | "demo";
-  priceDataSource: "live" | "demo";
+  priceDataSource: "live" | "demo" | "unavailable";
 }
 
 // ============================================================
@@ -279,6 +280,17 @@ export const mockAssets: Asset[] = [
 ];
 
 // ============================================================
+// SYMBOL NORMALIZATION STRATEGY
+// Consistent symbol resolution across /asset/nvdax, /asset/NVDAx, /asset/NVDAX, etc.
+// ============================================================
+export function normalizeSymbol(input: string): { clean: string; base: string; withX: string } {
+  const clean = input.toLowerCase().trim();
+  const withX = clean.endsWith("x") ? clean : `${clean}x`;
+  const base = clean.endsWith("x") && clean.length > 2 ? clean.slice(0, -1) : clean;
+  return { clean, base, withX };
+}
+
+// ============================================================
 // ASSET REPOSITORY
 // Abstraction layer — replace internals with API calls later.
 // ============================================================
@@ -288,12 +300,17 @@ export function getAllAssets(): Asset[] {
 
 export function getAssetById(idOrSymbol: string): Asset | undefined {
   if (!idOrSymbol) return undefined;
-  const q = idOrSymbol.toLowerCase().trim();
+  const { clean, base, withX } = normalizeSymbol(idOrSymbol);
   return mockAssets.find(
     (a) =>
-      a.id.toLowerCase() === q ||
-      a.tokenTicker.toLowerCase() === q ||
-      a.ticker.toLowerCase() === q
+      a.id.toLowerCase() === clean ||
+      a.id.toLowerCase() === withX ||
+      a.id.toLowerCase() === base ||
+      a.tokenTicker.toLowerCase() === clean ||
+      a.tokenTicker.toLowerCase() === withX ||
+      a.ticker.toLowerCase() === clean ||
+      a.ticker.toLowerCase() === base ||
+      (a.mintAddress && a.mintAddress.toLowerCase() === clean)
   );
 }
 

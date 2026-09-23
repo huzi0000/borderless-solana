@@ -10,27 +10,19 @@
 //   - ISIN codes
 //   - isTradingHalted status
 //   - Symbol, name, underlying ticker
+//   - Official token multipliers via GET /token/{symbol}/multiplier
 //
-// What this does NOT provide (requires auth or client account):
-//   - Live prices (falls back to mock prices, labelled DEMO PRICES)
-//   - Real quotes / execution (DemoExecutionProvider stays active)
-//
-// IMPORTANT:
-//   - Never invent mint addresses — only use addresses from API
-//   - Never silently fake success
-//   - If the API is unreachable, fall back to MockMarketDataProvider
+// What this does NOT provide publicly:
+//   - Live prices (requires institutional Backed API key).
+//   - When no key is present, price is marked "unavailable" (per Borderless policy:
+//     we NEVER masquerade demo prices as real prices in production).
 // ============================================================
 
 import type { MarketDataProvider } from "./provider";
-import type {
-  Asset,
-  BackedToken,
-  BackedTokenListResponse,
-} from "./types";
-import { mockAssets } from "@/data/assets";
+import type { Asset, BackedToken, BackedTokenListResponse } from "./types";
+import { mockAssets, normalizeSymbol } from "@/data/assets";
 
 type AssetCategory = Asset["category"];
-
 
 const BACKED_API_BASE = "https://api.backed.fi/api/v1";
 const FETCH_TIMEOUT_MS = 8000;
@@ -38,15 +30,15 @@ const FETCH_TIMEOUT_MS = 8000;
 // Extract the Solana mint address from a token's deployments array.
 // The Backed API prefixes Solana addresses with "svm:" — strip that.
 function extractSolanaMint(token: BackedToken): string | undefined {
+  if (!token.deployments || !Array.isArray(token.deployments)) return undefined;
   const deployment = token.deployments.find(
-    (d) => d.network === "Solana" && d.address.startsWith("svm:")
+    (d) => d && d.network === "Solana" && typeof d.address === "string"
   );
   if (!deployment) return undefined;
   return deployment.address.replace(/^svm:/, "");
 }
 
 // Determine the best display category based on the underlying symbol.
-// We only categorise tickers we actually know — the rest get "Other".
 const TICKER_CATEGORY_MAP: Record<string, AssetCategory> = {
   NVDA: "AI",
   AMD: "AI",
@@ -80,6 +72,7 @@ function inferCategory(underlying: string): AssetCategory {
 
 // Generate logo initials from a company name
 function initials(name: string): string {
+  if (!name) return "";
   return name
     .replace(/\s+xStock$/i, "")
     .split(/\s+/)
@@ -88,100 +81,70 @@ function initials(name: string): string {
     .join("");
 }
 
-// Logo colours keyed by first letter — consistent but not fabricated per-company
+// Logo colours keyed by first letter
 const LOGO_COLORS = [
   "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", "#f97316",
   "#eab308", "#22c55e", "#14b8a6", "#0ea5e9", "#3b82f6",
 ];
+
 function logoColor(symbol: string): string {
+  if (!symbol) return LOGO_COLORS[0];
   const idx = symbol.charCodeAt(0) % LOGO_COLORS.length;
   return LOGO_COLORS[idx];
 }
 
-// Build a mock-price lookup map from the existing demo data so we can
-// reuse realistic prices for assets we recognise, rather than showing $0.
-const mockPriceMap = new Map(
-  mockAssets.map((a) => [a.tokenTicker.toLowerCase(), a])
-);
-
-function getMockPriceData(tokenSymbol: string) {
-  const mock = mockPriceMap.get(tokenSymbol.toLowerCase());
-  if (mock) {
-    return {
-      price: mock.price,
-      change24h: mock.change24h,
-      changePercent24h: mock.changePercent24h,
-      popular: mock.popular,
-      logoInitials: mock.logoInitials,
-      logoColor: mock.logoColor,
-    };
-  }
-  // Unknown asset — use a neutral price placeholder
-  return {
-    price: 100.0,
-    change24h: 0,
-    changePercent24h: 0,
-    popular: false,
-    logoInitials: initials(tokenSymbol),
-    logoColor: logoColor(tokenSymbol),
-  };
-}
-
+// Map BackedToken into the canonical Asset format
 function backedTokenToAsset(token: BackedToken): Asset {
-  const priceData = getMockPriceData(token.symbol);
   const mint = extractSolanaMint(token);
-
-  // id: lowercase version of the symbol without trailing 'x', e.g. "nvdax"
-  const id = token.symbol.toLowerCase();
-
-  // The ticker without the trailing 'x' suffix is the underlying symbol
-  const ticker = token.underlyingSymbol;
+  const symbol = token.symbol || "";
+  const id = symbol.toLowerCase();
+  const ticker = token.underlyingSymbol || symbol.replace(/x$/i, "");
+  const companyName = token.name ? token.name.replace(/\s+xStock$/i, "") : symbol;
 
   return {
     id,
-    companyName: token.name.replace(/\s+xStock$/i, ""),
+    companyName,
     ticker,
-    tokenTicker: token.symbol,
+    tokenTicker: symbol,
     category: inferCategory(ticker),
-    description: token.description || `${token.symbol} — tokenized equity on xStocks`,
+    description: token.description || `${symbol} — tokenized equity on xStocks`,
 
-    // Prices: always mock / demo (no API key for collateral/quote)
-    price: priceData.price,
-    change24h: priceData.change24h,
-    changePercent24h: priceData.changePercent24h,
+    // Pricing: official price is unavailable from public feed without institutional key.
+    // Per Borderless transparency rules: never invent or fabricate prices.
+    price: undefined,
+    change24h: undefined,
+    changePercent24h: undefined,
 
-    // Display
-    logoInitials: priceData.logoInitials,
-    logoColor: priceData.logoColor,
+    // Display metadata
+    logoInitials: initials(companyName) || initials(symbol),
+    logoColor: logoColor(symbol),
 
     // Availability
-    popular: priceData.popular,
+    popular: ["NVDAx", "AAPLx", "TSLAx", "MSFTx", "AMZNx", "GOOGLx", "METAx", "SPYx", "QQQx"].includes(symbol),
     available: !token.isTradingHalted,
-    isTradingHalted: token.isTradingHalted,
+    isTradingHalted: !!token.isTradingHalted,
 
-    // ── Real xStocks fields ────────────────────────────────
+    // Real xStocks metadata verified from Backed API
     mintAddress: mint,
     mintNetwork: mint ? "Solana" : undefined,
-    isin: token.isin,
-    logoUrl: token.logo,
-    xstocksId: token.id,
+    isin: token.isin || undefined,
+    logoUrl: token.logo || undefined,
+    xstocksId: token.id || undefined,
 
-    // Token metadata is LIVE (from official API).
-    // Prices are DEMO (no key — labelled in UI).
     tokenDataSource: "live",
-    priceDataSource: "demo",
+    priceDataSource: "unavailable",
   };
 }
 
-async function fetchWithTimeout(url: string): Promise<Response> {
+async function fetchWithTimeout(url: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, {
       signal: controller.signal,
       headers: { Accept: "application/json" },
-      // Next.js: cache for 60 seconds on the server
-      next: { revalidate: 60 },
+      // Next.js: cache for 300 seconds (5 mins)
+      next: { revalidate: 300 },
     } as RequestInit);
     return res;
   } finally {
@@ -189,27 +152,18 @@ async function fetchWithTimeout(url: string): Promise<Response> {
   }
 }
 
+/**
+ * Fetches all official xStocks in a single HTTP request.
+ * Omitting pageSize returns the complete active token catalogue from api.backed.fi.
+ */
 async function fetchAllTokens(): Promise<BackedToken[]> {
-  const tokens: BackedToken[] = [];
-  let page = 0;
-  const pageSize = 100;
-
-  // Fetch up to 10 pages (1000 tokens) — the full xStocks catalogue
-  // In practice the catalogue has a few hundred tokens.
-  for (let i = 0; i < 10; i++) {
-    const url = `${BACKED_API_BASE}/token?type=xstocks&pageSize=${pageSize}&page=${page}`;
-    const res = await fetchWithTimeout(url);
-    if (!res.ok) {
-      console.warn(`[XStocksProvider] /token page ${page} returned ${res.status}`);
-      break;
-    }
-    const data: BackedTokenListResponse = await res.json();
-    tokens.push(...data.nodes);
-    if (!data.page.hasNextPage) break;
-    page++;
+  const url = `${BACKED_API_BASE}/token?type=xstocks`;
+  const res = await fetchWithTimeout(url);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch /token: HTTP ${res.status}`);
   }
-
-  return tokens;
+  const data: BackedTokenListResponse = await res.json();
+  return data.nodes || [];
 }
 
 export class XStocksProvider implements MarketDataProvider {
@@ -218,19 +172,48 @@ export class XStocksProvider implements MarketDataProvider {
 
   private cachedAssets: Asset[] | null = null;
   private cacheTime = 0;
-  private readonly cacheTtlMs = 60_000; // 60 seconds
+  private readonly cacheTtlMs = 300_000; // 5 minutes in-memory cache
+  private inflightFetch: Promise<Asset[]> | null = null;
 
   private async ensureCache(): Promise<Asset[]> {
+    // 1. Return in-memory cache if still fresh
     if (this.cachedAssets && Date.now() - this.cacheTime < this.cacheTtlMs) {
       return this.cachedAssets;
     }
-    const tokens = await fetchAllTokens();
-    if (tokens.length === 0) {
-      throw new Error("XStocksProvider: received 0 tokens from API");
+
+    // 2. Deduplicate concurrent requests (e.g. generateMetadata and page render)
+    if (this.inflightFetch) {
+      return this.inflightFetch;
     }
-    this.cachedAssets = tokens.map(backedTokenToAsset);
-    this.cacheTime = Date.now();
-    return this.cachedAssets;
+
+    this.inflightFetch = (async () => {
+      try {
+        const tokens = await fetchAllTokens();
+        if (tokens.length > 0) {
+          this.cachedAssets = tokens.map(backedTokenToAsset);
+          this.cacheTime = Date.now();
+          return this.cachedAssets;
+        }
+      } catch (err) {
+        console.warn("[XStocksProvider] Upstream fetch failed, using fallback:", err);
+      }
+
+      // If we have stale cache, serve it rather than failing
+      if (this.cachedAssets && this.cachedAssets.length > 0) {
+        return this.cachedAssets;
+      }
+
+      // Safe fallback to built-in mock assets so SSR never crashes
+      return mockAssets.map((a) => ({
+        ...a,
+        tokenDataSource: "demo" as const,
+        priceDataSource: "demo" as const,
+      }));
+    })().finally(() => {
+      this.inflightFetch = null;
+    });
+
+    return this.inflightFetch;
   }
 
   async getAssets(): Promise<Asset[]> {
@@ -239,13 +222,40 @@ export class XStocksProvider implements MarketDataProvider {
 
   async getAsset(idOrSymbol: string): Promise<Asset | undefined> {
     if (!idOrSymbol) return undefined;
-    const q = idOrSymbol.toLowerCase().trim();
+    const { clean, base, withX } = normalizeSymbol(idOrSymbol);
     const assets = await this.ensureCache();
-    return assets.find(
+
+    const found = assets.find(
       (a) =>
-        a.id === q ||
-        a.tokenTicker.toLowerCase() === q ||
-        a.ticker.toLowerCase() === q
+        a.id.toLowerCase() === clean ||
+        a.id.toLowerCase() === withX ||
+        a.id.toLowerCase() === base ||
+        a.tokenTicker.toLowerCase() === clean ||
+        a.tokenTicker.toLowerCase() === withX ||
+        a.ticker.toLowerCase() === clean ||
+        a.ticker.toLowerCase() === base ||
+        (a.mintAddress && a.mintAddress.toLowerCase() === clean)
     );
+
+    if (!found) return undefined;
+
+    // Fast optional enrichment: query official token multiplier from public endpoint
+    try {
+      const multUrl = `${BACKED_API_BASE}/token/${encodeURIComponent(found.tokenTicker)}/multiplier?network=Solana`;
+      const multRes = await fetchWithTimeout(multUrl, 2500);
+      if (multRes.ok) {
+        const multData = await multRes.json();
+        if (typeof multData.currentMultiplier === "number") {
+          return {
+            ...found,
+            currentMultiplier: multData.currentMultiplier,
+          };
+        }
+      }
+    } catch {
+      // Non-blocking: multiplier failure does not impede asset detail rendering
+    }
+
+    return found;
   }
 }

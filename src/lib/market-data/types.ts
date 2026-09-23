@@ -9,7 +9,7 @@ export type { Asset, AssetCategory, PricePoint } from "@/data/assets";
 
 // Source labels used throughout the UI so the user always knows
 // what is real vs simulated. Never silently fake live data.
-export type DataSource = "live" | "demo";
+export type DataSource = "live" | "demo" | "unavailable";
 
 // ── Raw response types from Backed API ──────────────────────
 
