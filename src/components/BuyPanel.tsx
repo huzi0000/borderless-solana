@@ -267,7 +267,7 @@ export function BuyPanel({ asset }: BuyPanelProps) {
               <Globe2 size={11} />
               Network
             </span>
-            <span className="text-text-secondary">Solana Devnet</span>
+            <span className="text-text-secondary">{getNetworkDisplayName()}</span>
           </div>
           <div className="flex items-center justify-between text-xs">
             <span className="flex items-center gap-1 text-text-muted">
@@ -295,11 +295,13 @@ export function BuyPanel({ asset }: BuyPanelProps) {
         </button>
 
         {!hasPrice ? (
-          <p className="mt-2 text-center text-xs text-amber-400/90">
-            Reference price is unavailable from public feed. Trade simulation is paused for this asset.
-          </p>
+          <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-center">
+            <p className="text-xs text-amber-400/90 leading-relaxed">
+              Reference price is unavailable from public feed. Trade simulation is paused for this asset.
+            </p>
+          </div>
         ) : !isValid ? (
-          <p className="mt-2 text-center text-xs text-text-muted">
+          <p className="mt-2.5 text-center text-xs text-text-muted">
             {side === "SELL" && availableUnits <= 0
               ? "You do not hold this asset yet"
               : "Enter an amount to continue"}
